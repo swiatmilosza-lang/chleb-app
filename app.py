@@ -133,23 +133,35 @@ elif menu == "Panel Sprzedawcy":
         st.subheader("🛒 Zarządzanie Magazynem")
         of_df = load_products()
         
-        with st.expander("➕ DODAJ PRODUKT I ZDJĘCIE"):
-            p_nazwa = st.text_input("Nazwa produktu:")
-            p_koszt = st.number_input("Koszt (pkt):", value=100)
-            p_sztuk = st.number_input("Ilość sztuk:", value=10)
+                with st.expander("➕ Dodaj Produkt i ZDJĘCIE"):
+            n_naz = st.text_input("Nazwa produktu (np. Chleb):")
+            n_kos = st.number_input("Koszt (w Bąbelkach):", value=100)
+            n_szt = st.number_input("Ile masz sztuk:", value=10)
             
-            # TO JEST PRZYCISK DO WYBIERANIA ZDJĘCIA Z KOMPUTERA
-            p_foto = st.file_uploader("Wybierz zdjęcie z komputera (JPG)", type=['jpg', 'jpeg', 'png'])
+            # --- PRZYCISK DO DODAWANIA ZDJĘCIA ---
+            p_foto = st.file_uploader("Dodaj zdjęcie z komputera (JPG/PNG)", type=['jpg', 'jpeg', 'png'])
             
-            if st.button("ZAPISZ PRODUKT"):
-                if p_nazwa:
-                    new_p = pd.DataFrame([{'Nagroda':p_nazwa, 'Koszt':p_koszt, 'Sztuk':p_sztuk}])
-                    of_df = pd.concat([of_df, new_p], ignore_index=True)
-                    save_products(of_df)
+            if st.button("Zapisz produkt ze zdjęciem"):
+                if n_naz:
+                    # Logika zapisu danych do bazy
+                    if n_naz in of_df['Nagroda'].values:
+                        of_df.loc[of_df['Nagroda'] == n_naz, ['Koszt', 'Sztuk']] = [n_kos, n_szt]
+                    else:
+                        nowy_p = pd.DataFrame([{'Nagroda':n_naz, 'Koszt':n_kos, 'Sztuk':n_szt}])
+                        of_df = pd.concat([of_df, nowy_p], ignore_index=True)
+                    
+                    # Logika zapisu zdjęcia na serwerze
                     if p_foto:
                         img = Image.open(p_foto).convert('RGB')
-                        img.save(os.path.join(IMG_DIR, f"{p_nazwa}.jpg"))
-                    st.success(f"Dodano {p_nazwa}!"); st.rerun()
+                        img.save(os.path.join(IMG_DIR, f"{n_naz}.jpg"))
+                        st.success(f"Zdjęcie dla {n_naz} zostało zapisane!")
+                    
+                    save_products(of_df)
+                    st.success(f"Produkt {n_naz} dodany do oferty!")
+                    st.rerun()
+                else:
+                    st.warning("Musisz wpisać nazwę produktu!")
+
 
         st.dataframe(of_df)
         
