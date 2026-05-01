@@ -4,7 +4,7 @@ import random
 import os
 
 # Konfiguracja VIP
-st.set_page_config(page_title="Chleb-App VIP", page_icon="🥖")
+st.set_page_config(page_title="Bąbelkowa Aplikacja", page_icon="🥖")
 
 # ZMIENIŁEM NAZWĘ PLIKU, ABY SAMO DODRABIAŁO NOWE KOLUMNY
 DB_FILE = "baza_v4_nagrody.csv"
