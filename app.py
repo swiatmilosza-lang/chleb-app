@@ -6,7 +6,7 @@ import os
 # Konfiguracja VIP
 st.set_page_config(page_title="Chleb-App VIP", page_icon="🥖")
 
-DB_FILE = "baza_zapasow.csv"
+DB_FILE = "baza_v3.csv"
 
 # Funkcja ładowania danych (dodaliśmy kolumny Gmail i Haslo)
 def load_data():
