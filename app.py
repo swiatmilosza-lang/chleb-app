@@ -28,6 +28,8 @@ def load_data():
         for col in kolumny:
             if col not in df.columns:
                 df[col] = "" if col == 'Aktywna_Nagroda' else (0 if col == 'Punkty' else "")
+        # Zamiana wartości NaN w kolumnie Aktywna_Nagroda na pusty tekst
+        df['Aktywna_Nagroda'] = df['Aktywna_Nagroda'].fillna("")
         return df[kolumny]
     return pd.DataFrame(columns=kolumny)
 
@@ -37,7 +39,6 @@ def save_data(df):
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
         return pd.read_csv(PRODUCTS_FILE)
-    # Domyślna oferta na start
     return pd.DataFrame([
         {'Nagroda': 'Mini Pizza', 'Koszt': 30, 'Sztuk': 5},
         {'Nagroda': 'Zakwas', 'Koszt': 50, 'Sztuk': 5},
@@ -79,7 +80,6 @@ if menu == "Mój Profil":
             if st.button("Zaloguj się"):
                 user_row = st.session_state.db[st.session_state.db['Gmail'] == login_email]
                 if not user_row.empty:
-                    # Poprawione pobieranie hasła
                     poprawne_haslo = str(user_row['Haslo'].iloc[0])
                     if poprawne_haslo == str(login_pass):
                         st.session_state.logged_in_email = login_email
@@ -121,7 +121,6 @@ if menu == "Mój Profil":
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
-            # --- POPRAWIONE INDEKSOWANIE PANDAS ---
             idx = user_row.index[0]
             name = user_row['Nazwa'].iloc[0]
             kod = user_row['Kod'].iloc[0]
@@ -135,15 +134,13 @@ if menu == "Mój Profil":
             with col_b:
                 st.metric("Twój Kod", kod)
             
-            # Wyświetlanie aktywnych kuponów
-            if not (pd.isna(aktywna) or aktywna == ""):
+            if not (pd.isna(aktywna) or str(aktywna).strip() == ""):
                 st.warning(f"🎫 MASZ AKTYWNE KUPONY: **{aktywna}**")
                 st.info("Pokaż kod 5-cyfrowy przy stoisku!")
 
             st.write("---")
             st.subheader("🎁 Aktywuj nagrodę za punkty:")
             
-            # Wczytywanie dynamicznej listy nagród
             oferta_df = load_products()
             
             for index, row in oferta_df.iterrows():
@@ -170,13 +167,11 @@ if menu == "Mój Profil":
                         
                         if st.button(tekst, key=f"kup_{nagroda}", type=typ):
                             if pkt >= koszt:
-                                # Pobieranie punktów i sztuk
                                 st.session_state.db.loc[idx, 'Punkty'] -= koszt
                                 oferta_df.loc[index, 'Sztuk'] -= 1
                                 save_products(oferta_df)
                                 
-                                # Dopisywanie kuponu
-                                if pd.isna(aktywna) or aktywna == "":
+                                if pd.isna(aktywna) or str(aktywna).strip() == "":
                                     st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
                                 else:
                                     st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = f"{aktywna}, {nagroda}"
@@ -200,14 +195,12 @@ elif menu == "Panel Sprzedawcy":
     pin = st.text_input("Hasło VIP:", type="password")
     if pin == "milosz2137":
         
-        # --- ZAKŁADKA 1: OBSŁUGA KLIENTA ---
         st.subheader("👥 Obsługa Klienta")
         kod_input = st.text_input("Wpisz 5-cyfrowy kod klienta:")
         
         if kod_input:
             user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
             if not user_search.empty:
-                # --- POPRAWIONE INDEKSOWANIE PANDAS ---
                 idx = user_search.index[0]
                 klient = user_search['Nazwa'].iloc[0]
                 punkty_klienta = user_search['Punkty'].iloc[0]
@@ -215,10 +208,11 @@ elif menu == "Panel Sprzedawcy":
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
-                # Wydawanie wielu kuponów pojedynczo
-                if kupon and kupon != "":
-                    st.warning(f"🔔 Klient chce odebrać: **{kupon}**")
-                    lista_kuponow = [k.strip() for k in kupon.split(",")]
+                # POPRAWKA BŁĘDU SPLIT
+                kupon_str = str(kupon).strip()
+                if kupon_str != "" and not pd.isna(kupon):
+                    st.warning(f"🔔 Klient chce odebrać: **{kupon_str}**")
+                    lista_kuponow = [k.strip() for k in kupon_str.split(",") if k.strip()]
                     
                     for k in lista_kuponow:
                         if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{idx}"):
@@ -243,7 +237,6 @@ elif menu == "Panel Sprzedawcy":
         
         st.write("---")
         
-        # --- ZAKŁADKA 2: ZARZĄDZANIE OFERTĄ ---
         st.subheader("🛒 Zarządzanie Ofertą (Magazyn)")
         oferta_df = load_products()
         st.dataframe(oferta_df)
@@ -252,26 +245,15 @@ elif menu == "Panel Sprzedawcy":
             p_name = st.text_input("Nazwa nagrody:")
             p_cost = st.number_input("Koszt (Bąbelki):", min_value=1, value=10)
             p_stock = st.number_input("Ilość sztuk:", min_value=0, value=5)
-                    
-        with st.expander("🗑️ Usuń Produkt z Oferty"):
-            delete_name = st.selectbox("Wybierz produkt do usunięcia:", oferta_df['Nagroda'].values)
-            if st.button("Usuń trwale ten produkt"):
-                # Usuwanie produktu z tabeli
-                oferta_df = oferta_df[oferta_df['Nagroda'] != delete_name]
-                save_products(oferta_df)
-                st.success(f"Usunięto produkt: {delete_name}")
-                st.rerun()
-
             
             if st.button("Zapisz Produkt w Ofercie"):
                 if p_name:
                     if p_name in oferta_df['Nagroda'].values:
-                        # Aktualizacja istniejącego produktu
-                        oferta_df.loc[oferta_df['Nagroda'] == p_name, 'Koszt'] = p_cost
-                        oferta_df.loc[oferta_df['Nagroda'] == p_name, 'Sztuk'] = p_stock
+                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index[0]
+                        oferta_df.loc[ofer_idx, 'Koszt'] = p_cost
+                        oferta_df.loc[ofer_idx, 'Sztuk'] = p_stock
                         st.success(f"Zaktualizowano produkt: {p_name}")
                     else:
-                        # Dodawanie nowego produktu
                         nowy_p = pd.DataFrame([{'Nagroda': p_name, 'Koszt': p_cost, 'Sztuk': p_stock}])
                         oferta_df = pd.concat([oferta_df, nowy_p], ignore_index=True)
                         st.success(f"Dodano nowy produkt: {p_name}")
@@ -284,11 +266,11 @@ elif menu == "Panel Sprzedawcy":
         st.subheader("Baza Klientów")
         st.dataframe(st.session_state.db)
 
-# --- SEKCJA: YOUTUBE & INFO ---
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
     st.write("Wpadnij na mój kanał, by zobaczyć przygotowania!")
+
 
 
 
