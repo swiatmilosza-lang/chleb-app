@@ -33,8 +33,11 @@ def load_data():
     kolumny = ['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty', 'Aktywna_Nagroda']
     if os.path.exists(DB_FILE):
         df = pd.read_csv(DB_FILE, dtype={'Kod': str, 'Haslo': str, 'Aktywna_Nagroda': str})
+        for col in kolumny:
+            if col not in df.columns:
+                df[col] = "" if col == 'Aktywna_Nagroda' else (0 if col == 'Punkty' else "")
         df['Aktywna_Nagroda'] = df['Aktywna_Nagroda'].fillna("")
-        return df
+        return df[kolumny]
     return pd.DataFrame(columns=kolumny)
 
 def save_data(df):
@@ -43,11 +46,16 @@ def save_data(df):
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
         return pd.read_csv(PRODUCTS_FILE)
-    return pd.DataFrame(columns=['Nagroda', 'Koszt', 'Sztuk'])
+    return pd.DataFrame([
+        {'Nagroda': 'Zakwas świeży', 'Koszt': 150, 'Sztuk': 10},
+        {'Nagroda': 'Zakwas suszony', 'Koszt': 300, 'Sztuk': 10},
+        {'Nagroda': 'Chleb', 'Koszt': 500, 'Sztuk': 10}
+    ])
 
 def save_products(df):
     df.to_csv(PRODUCTS_FILE, index=False)
 
+# Inicjalizacja baz
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
@@ -69,144 +77,158 @@ menu = st.sidebar.radio("Menu", ["Mój Profil", "Panel Sprzedawcy", "YouTube & I
 # --- SEKCJA: MÓJ PROFIL ---
 if menu == "Mój Profil":
     if st.session_state.logged_in_email is None:
-        st.header("Zaloguj się")
+        st.header("Zaloguj się lub załóż konto")
         tab1, tab2 = st.tabs(["Logowanie", "Rejestracja"])
+        
         with tab1:
-            l_email = st.text_input("Gmail:")
-            l_pass = st.text_input("Hasło:", type="password")
-            if st.button("Zaloguj"):
+            l_email = st.text_input("Twój Gmail:", key="l_email")
+            l_pass = st.text_input("Hasło:", type="password", key="l_pass")
+            if st.button("Zaloguj się"):
                 u_row = st.session_state.db[st.session_state.db['Gmail'] == l_email]
-                if not u_row.empty and str(u_row['Haslo'].iloc[0]) == str(l_pass):
-                    st.session_state.logged_in_email = l_email
-                    st.query_params["user_email"] = l_email
-                    st.rerun()
-                else: st.error("Błąd danych")
+                if not u_row.empty:
+                    if str(u_row['Haslo'].iloc[0]) == str(l_pass):
+                        st.session_state.logged_in_email = l_email
+                        st.query_params["user_email"] = l_email
+                        st.rerun()
+                    else: st.error("Błędne hasło!")
+                else: st.error("Brak konta.")
+        
         with tab2:
             n_name = st.text_input("Imię:")
             n_email = st.text_input("Gmail:")
             n_pass = st.text_input("Hasło:", type="password")
-            if st.button("Zarejestruj (+50 pkt)"):
+            if st.button("Zarejestruj mnie"):
                 if n_name and n_email and n_pass:
-                    n_kod = str(random.randint(10000, 99999))
-                    new_u = pd.DataFrame([{'Nazwa': n_name, 'Gmail': n_email, 'Haslo': str(n_pass), 'Kod': n_kod, 'Punkty': 50, 'Aktywna_Nagroda': ""}])
-                    st.session_state.db = pd.concat([st.session_state.db, new_u], ignore_index=True)
-                    save_data(st.session_state.db)
-                    st.session_state.logged_in_email = n_email
-                    st.query_params["user_email"] = n_email
-                    st.success("Witaj!"); st.rerun()
+                    if n_email not in st.session_state.db['Gmail'].values:
+                        n_kod = str(random.randint(10000, 99999))
+                        new_u = pd.DataFrame([{'Nazwa': n_name, 'Gmail': n_email, 'Haslo': str(n_pass), 'Kod': n_kod, 'Punkty': 50, 'Aktywna_Nagroda': ""}])
+                        st.session_state.db = pd.concat([st.session_state.db, new_u], ignore_index=True)
+                        save_data(st.session_state.db)
+                        st.session_state.logged_in_email = n_email
+                        st.query_params["user_email"] = n_email
+                        st.success("Witaj!"); st.balloons(); st.rerun()
+                    else: st.error("E-mail zajęty.")
     else:
         u_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
-        idx = u_row.index
-        st.header(f"Witaj, {u_row['Nazwa'].iloc[0]}!")
-        c_a, c_b = st.columns(2)
-        c_a.metric("Bąbelki", int(u_row['Punkty'].iloc[0]))
-        c_b.metric("Kod", u_row['Kod'].iloc[0])
-        
-        qr = qrcode.make(str(u_row['Kod'].iloc[0]))
-        st.image(qr.get_image(), width=150, caption="Twój kod do skanowania")
+        if not u_row.empty:
+            idx = u_row.index
+            name, kod, pkt, aktywna = u_row['Nazwa'].iloc[0], u_row['Kod'].iloc[0], u_row['Punkty'].iloc[0], u_row['Aktywna_Nagroda'].iloc[0]
+            
+            st.header(f"Witaj, {name}!")
+            c_a, c_b = st.columns(2)
+            c_a.metric("Bąbelki", f"{pkt}")
+            c_b.metric("Twój Kod", kod)
+            
+            qr = qrcode.make(str(kod))
+            st.image(qr.get_image(), width=180)
+            
+            if aktywna: st.warning(f"🎫 KUPONY: {aktywna}")
 
-        st.write("---")
-        st.subheader("🎁 Oferta Inżyniera:")
-        o_df = load_products()
-        for i, r in o_df.iterrows():
-            col_img, col_txt = st.columns([1, 2])
-            with col_img:
-                img_path = os.path.join(IMG_DIR, f"{r['Nagroda']}.jpg")
-                if os.path.exists(img_path):
-                    st.image(img_path, use_container_width=True)
-                else: st.info("Brak foto")
-            with col_txt:
-                st.subheader(r['Nagroda'])
-                st.write(f"Koszt: {r['Koszt']} pkt | Sztuk: {r['Sztuk']}")
-                if st.button(f"Aktywuj", key=f"btn_{i}", type="primary" if u_row['Punkty'].iloc[0] >= r['Koszt'] else "secondary"):
-                    if u_row['Punkty'].iloc[0] >= r['Koszt'] and r['Sztuk'] > 0:
-                        st.session_state.db.loc[idx, 'Punkty'] -= r['Koszt']
-                        o_df.loc[i, 'Sztuk'] -= 1
-                        save_products(o_df)
-                        save_data(st.session_state.db)
-                        st.success("Aktywowano!"); st.rerun()
+            st.write("---")
+            st.subheader("🎁 Oferta Inżyniera:")
+            o_df = load_products()
+            for i, r in o_df.iterrows():
+                col_img, col_txt = st.columns([1, 2])
+                with col_img:
+                    img_path = os.path.join(IMG_DIR, f"{r['Nagroda']}.jpg")
+                    if os.path.exists(img_path): st.image(img_path, use_container_width=True)
+                    else: st.info("📸")
+                with col_txt:
+                    st.write(f"**{r['Nagroda']}**")
+                    st.write(f"Koszt: {r['Koszt']} pkt | Sztuk: {r['Sztuk']}")
+                    btn_t = "primary" if pkt >= r['Koszt'] else "secondary"
+                    if st.button(f"🟢 Aktywuj" if pkt >= r['Koszt'] else "Zbieraj dalej", key=f"k_{r['Nagroda']}", type=btn_t):
+                        if pkt >= r['Koszt'] and r['Sztuk'] > 0:
+                            st.session_state.db.loc[idx, 'Punkty'] -= r['Koszt']
+                            o_df.loc[i, 'Sztuk'] -= 1
+                            save_products(o_df)
+                            stara = st.session_state.db.loc[idx, 'Aktywna_Nagroda']
+                            st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = r['Nagroda'] if not stara else f"{stara}, {r['Nagroda']}"
+                            save_data(st.session_state.db)
+                            st.rerun()
+            
+            if st.button("Wyloguj"):
+                st.session_state.logged_in_email = None
+                st.query_params.clear(); st.rerun()
 
 # --- SEKCJA: PANEL SPRZEDAWCY ---
 elif menu == "Panel Sprzedawcy":
-        pin = st.text_input("Hasło VIP:", type="password")
-        if pin == "milosz2137":
-            st.subheader("📸 Szybki Skaner QR")
+    st.header("🔐 Autoryzacja")
+    pin = st.text_input("Hasło VIP:", type="password")
+    
+    if pin == "milosz2137":
+        # Dopiero po haśle ładujemy ofertę i wyświetlamy resztę
+        of_df = load_products()
         
-        # Inicjalizacja pamięci skanu, jeśli nie istnieje
-        if 'last_scan' not in st.session_state:
-            st.session_state.last_scan = ""
-            
-        # Wyświetlenie okna kamery
-        img_cam = st.camera_input("Skieruj aparat na kod QR klienta")
-        
+        st.subheader("📸 Skaner QR")
+        if 'last_scan' not in st.session_state: st.session_state.last_scan = ""
+        img_cam = st.camera_input("Zeskanuj kod QR klienta")
         if img_cam:
-            import cv2
-            import numpy as np
-            
-            # Przetwarzanie obrazu
             f_b = np.asarray(bytearray(img_cam.read()), dtype=np.uint8)
             cv_i = cv2.imdecode(f_b, 1)
-            
-            # Detekcja kodu QR
-            det = cv2.QRCodeDetector()
-            val, b, s = det.detectAndDecode(cv_i)
-            
+            val, b, s = cv2.QRCodeDetector().detectAndDecode(cv_i)
             if val: 
                 st.session_state.last_scan = val
-                st.success(f"✅ Odczytano kod: {val}")
-        
-        st.write("---")
-        # Pole na kod, które automatycznie uzupełnia się po skanie
-        k_in = st.text_input("Kod klienta (wpisz lub zeskanuj powyżej):", value=st.session_state.last_scan)
+                st.success(f"Odczytano: {val}")
 
+        st.write("---")
+        k_in = st.text_input("Kod klienta:", value=st.session_state.last_scan)
+        if k_in:
+            search = st.session_state.db[st.session_state.db['Kod'] == k_in]
+            if not search.empty:
+                s_idx = search.index
+                st.write(f"**Klient:** {search['Nazwa'].iloc[0]} | **Punkty:** {search['Punkty'].iloc[0]}")
+                k_str = str(search['Aktywna_Nagroda'].iloc[0]).strip()
+                if k_str and k_str != "nan":
+                    lista = [k.strip() for k in k_str.split(",") if k.strip()]
+                    for i, k in enumerate(lista):
+                        if st.button(f"Wydaj: {k}", key=f"w_{i}_{k_in}"):
+                            lista.pop(i)
+                            st.session_state.db.loc[s_idx, 'Aktywna_Nagroda'] = ", ".join(lista)
+                            save_data(st.session_state.db); st.rerun()
+                
+                p_za_zl = 10
+                kwota = st.number_input("Kwota (zł):", min_value=1, value=10)
+                if st.button("DODAJ PUNKTY"):
+                    st.session_state.db.loc[s_idx, 'Punkty'] += (kwota * p_za_zl)
+                    save_data(st.session_state.db); st.success("Dodano!"); st.rerun()
+
+        st.write("---")
+        st.subheader("🛒 Zarządzanie Magazynem")
+        st.dataframe(of_df)
         
         with st.expander("➕ Dodaj Produkt i ZDJĘCIE"):
-            n_naz = st.text_input("Nazwa produktu (np. Chleb):")
-            n_kos = st.number_input("Koszt (w Bąbelkach):", value=100)
-            n_szt = st.number_input("Ile masz sztuk:", value=10)
-            
-            # --- PRZYCISK DO DODAWANIA ZDJĘCIA ---
-            p_foto = st.file_uploader("Dodaj zdjęcie z komputera (JPG/PNG)", type=['jpg', 'jpeg', 'png'])
-            
-            if st.button("Zapisz produkt ze zdjęciem"):
+            n_naz = st.text_input("Nazwa produktu:")
+            n_kos = st.number_input("Koszt (pkt):", value=100)
+            n_szt = st.number_input("Sztuk:", value=10)
+            p_foto = st.file_uploader("Wgraj zdjęcie (JPG)", type=['jpg', 'jpeg', 'png'])
+            if st.button("Zapisz"):
                 if n_naz:
-                    # Logika zapisu danych do bazy
                     if n_naz in of_df['Nagroda'].values:
                         of_df.loc[of_df['Nagroda'] == n_naz, ['Koszt', 'Sztuk']] = [n_kos, n_szt]
                     else:
-                        nowy_p = pd.DataFrame([{'Nagroda':n_naz, 'Koszt':n_kos, 'Sztuk':n_szt}])
-                        of_df = pd.concat([of_df, nowy_p], ignore_index=True)
-                    
-                    # Logika zapisu zdjęcia na serwerze
+                        new_p = pd.DataFrame([{'Nagroda':n_naz, 'Koszt':n_kos, 'Sztuk':n_szt}])
+                        of_df = pd.concat([of_df, new_p], ignore_index=True)
                     if p_foto:
                         img = Image.open(p_foto).convert('RGB')
                         img.save(os.path.join(IMG_DIR, f"{n_naz}.jpg"))
-                        st.success(f"Zdjęcie dla {n_naz} zostało zapisane!")
-                    
-                    save_products(of_df)
-                    st.success(f"Produkt {n_naz} dodany do oferty!")
-                    st.rerun()
-                else:
-                    st.warning("Musisz wpisać nazwę produktu!")
+                    save_products(of_df); st.rerun()
 
+        with st.expander("🗑️ Usuń produkt"):
+            if not of_df.empty:
+                del_p = st.selectbox("Co usunąć?", of_df['Nagroda'].values)
+                if st.button("Usuń"):
+                    of_df = of_df[of_df['Nagroda'] != del_p]
+                    save_products(of_df); st.rerun()
 
-        st.dataframe(of_df)
-        
         st.write("---")
-        st.subheader("👥 Obsługa Klienta (Punkty)")
-        # Skaner i dodawanie punktów (1zł = 10pkt)
-        kwota = st.number_input("Kwota zakupu (zł):", min_value=0)
-        kod_k = st.text_input("Kod klienta (5 cyfr):")
-        if st.button("DODAJ PUNKTY (10 pkt za 1 zł)"):
-            if kod_k in st.session_state.db['Kod'].values:
-                idx_k = st.session_state.db[st.session_state.db['Kod'] == kod_k].index
-                st.session_state.db.loc[idx_k, 'Punkty'] += (kwota * 10)
-                save_data(st.session_state.db)
-                st.success(f"Dodano {kwota*10} pkt!"); st.rerun()
+        st.subheader("👥 Klienci")
+        st.dataframe(st.session_state.db)
 
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+
 
 
 
