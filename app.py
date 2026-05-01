@@ -110,5 +110,15 @@ elif menu == "Panel Sprzedawcy":
         st.dataframe(st.session_state.db)
 
 elif menu == "YouTube & Info":
-    st.header("Subskrybuj Inżynier Wypieku!")
-    # st.video("LINK_DO_TWOJEGO_FILMU")
+    st.header("Subskrybuj światmilosza-lang!")
+    
+    # GŁÓWNY PRZYCISK DO KANAŁU
+    st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+    
+    st.write("---")
+    st.subheader("Jak upiec idealny chleb?")
+    st.write("Oglądaj moje poradniki, aby Twój zakwas zawsze był silny!")
+    
+    # Możesz dodać też zwykły link tekstowy, jeśli wolisz:
+    st.markdown("[Kliknij tutaj, aby subskrybować](https://www.youtube.com/@inzynierwypieku)")
+
