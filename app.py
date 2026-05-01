@@ -6,10 +6,20 @@ import os
 # Konfiguracja VIP
 st.set_page_config(page_title="Bąbelkowa Aplikacja", page_icon="🥖")
 
-# ZMIENIŁEM NAZWĘ PLIKU, ABY SAMO DODRABIAŁO NOWE KOLUMNY
-DB_FILE = "baza_v4_nagrody.csv"
+# STYL CSS - Robi przycisk primary na zielono
+st.markdown("""
+    <style>
+    div.stButton > button[kind="primary"] {
+        background-color: #28a745 !important;
+        color: white !important;
+        border-color: #28a745 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
 
-# Funkcja ładowania danych (obsługuje teraz nagrody)
+DB_FILE = "baza_inzynier.csv"
+
+# Funkcja ładowania danych (Wersja samonaprawcza)
 def load_data():
     kolumny = ['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty', 'Aktywna_Nagroda']
     if os.path.exists(DB_FILE):
@@ -26,18 +36,14 @@ def save_data(df):
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
-# LOGIKA AUTOMATYCZNEGO LOGOWANIA (POPRAWIONA)
+# LOGIKA AUTOMATYCZNEGO LOGOWANIA (Zabezpieczona)
 if "user_email" in st.query_params:
     email_z_linku = st.query_params["user_email"]
-    # Sprawdzamy czy ten email faktycznie jest w bazie
     if email_z_linku in st.session_state.db['Gmail'].values:
         st.session_state.logged_in_email = email_z_linku
     else:
         st.session_state.logged_in_email = None
-        st.query_params.clear() # Czyści błędny link
-elif "logged_in_email" not in st.session_state:
-    st.session_state.logged_in_email = None
-
+        st.query_params.clear()
 elif "logged_in_email" not in st.session_state:
     st.session_state.logged_in_email = None
 
@@ -65,14 +71,14 @@ if menu == "Mój Profil":
                     else:
                         st.error("Błędne hasło!")
                 else:
-                    st.error("Nie znaleziono konta.")
+                    st.error("Nie znaleziono konta z tym adresem Gmail.")
         
         with tab2:
             st.subheader("Załóż nowe konto")
             st.warning("⚠️ NIE wpisuj tu swojego prawdziwego hasła do Gmaila!")
             new_name = st.text_input("Twoje Imię:")
             new_email = st.text_input("Twój Gmail:")
-            new_pass = st.text_input("Hasło do apki:", type="password")
+            new_pass = st.text_input("Wymyśl hasło do apki:", type="password")
             
             if st.button("Zarejestruj mnie (+5 pkt!)"):
                 if new_name and new_email and new_pass:
@@ -84,13 +90,16 @@ if menu == "Mój Profil":
                         }])
                         st.session_state.db = pd.concat([st.session_state.db, nowy_user], ignore_index=True)
                         save_data(st.session_state.db)
+                        
                         st.session_state.logged_in_email = new_email
                         st.query_params["user_email"] = new_email
-                        st.success("Konto założone!")
+                        st.success("Witaj w klubie!")
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("Ten Gmail jest już zajęty.")
+                        st.error("Ten adres Gmail jest już zarejestrowany.")
+                else:
+                    st.warning("Wypełnij wszystkie pola!")
 
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
@@ -108,7 +117,6 @@ if menu == "Mój Profil":
             with col_b:
                 st.metric("Twój Kod", kod)
             
-            # Stan aktywacji kuponu
             if pd.isna(aktywna) or aktywna == "":
                 st.write("---")
                 st.subheader("🎁 Aktywuj nagrodę za punkty:")
@@ -116,11 +124,19 @@ if menu == "Mój Profil":
                 cennik = {"Mini Pizza": 30, "Zakwas": 50, "Chleb": 70}
                 
                 for nagroda, koszt in cennik.items():
-                    col1, col2 = st.columns([3, 1])
+                    col1, col2 = st.columns(2)
                     with col1:
                         st.write(f"**{nagroda}** ({koszt} Bąbelków)")
                     with col2:
-                        if st.button("Aktywuj", key=nagroda):
+                        # Zielony przycisk gdy stać klienta
+                        if pkt >= koszt:
+                            typ = "primary"
+                            tekst = "🟢 Aktywuj"
+                        else:
+                            typ = "secondary"
+                            tekst = "Aktywuj"
+                        
+                        if st.button(tekst, key=nagroda, type=typ):
                             if pkt >= koszt:
                                 st.session_state.db.loc[idx, 'Punkty'] -= koszt
                                 st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
@@ -155,7 +171,6 @@ elif menu == "Panel Sprzedawcy":
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
-                # WYŚWIETLANIE AKTYWNEGO KUPONU
                 if kupon and kupon != "":
                     st.warning(f"🔔 Klient chce odebrać: **{kupon}**")
                     if st.button("Wydaj nagrodę (Kasuje kupon)"):
@@ -174,7 +189,7 @@ elif menu == "Panel Sprzedawcy":
                     st.success(f"Dodano! Klient ma teraz {st.session_state.db.loc[idx, 'Punkty']} pkt.")
                     st.rerun()
             else:
-                st.error("Nie znaleziono kodu.")
+                st.error("Nie znaleziono takiego kodu.")
         
         st.subheader("Baza Klientów")
         st.dataframe(st.session_state.db)
@@ -182,6 +197,8 @@ elif menu == "Panel Sprzedawcy":
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+
+
 
 
 
