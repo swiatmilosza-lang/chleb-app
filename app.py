@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import random
 import os
+import cv2
+import numpy as np
 
 # Konfiguracja VIP
 st.set_page_config(page_title="Bąbelkowa Aplikacja", page_icon="🥖")
@@ -79,7 +81,7 @@ if menu == "Mój Profil":
             if st.button("Zaloguj się"):
                 user_row = st.session_state.db[st.session_state.db['Gmail'] == login_email]
                 if not user_row.empty:
-                    poprawne_haslo = str(user_row['Haslo'].iloc)
+                    poprawne_haslo = str(user_row['Haslo'].iloc[0])
                     if poprawne_haslo == str(login_pass):
                         st.session_state.logged_in_email = login_email
                         st.query_params["user_email"] = login_email
@@ -91,7 +93,7 @@ if menu == "Mój Profil":
         
         with tab2:
             st.subheader("Załóż nowe konto")
-            st.warning("⚠️ NIE wpisuj tu swojego prawdziwego hasła do Gmaila!")
+            st.warning("⚠️ NIE wpisuj tu prawdziwego hasła do Gmaila!")
             new_name = st.text_input("Twoje Imię:")
             new_email = st.text_input("Twój Gmail:")
             new_pass = st.text_input("Hasło do apki:", type="password")
@@ -113,14 +115,14 @@ if menu == "Mój Profil":
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("Ten adres Gmail jest już zarejestrowany.")
+                        st.error("Ten adres Gmail jest już zajęty.")
                 else:
                     st.warning("Wypełnij wszystkie pola!")
 
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
-            idx = user_row.index
+            idx = user_row.index[0]
             name = user_row['Nazwa'].iloc[0]
             kod = user_row['Kod'].iloc[0]
             pkt = user_row['Punkty'].iloc[0]
@@ -132,6 +134,9 @@ if menu == "Mój Profil":
                 st.metric("Twoje Zapasy", f"{pkt} Bąbelków")
             with col_b:
                 st.metric("Twój Kod", kod)
+            
+            # Kod QR dla klienta
+            st.image(f"https://qrserver.com{kod}", caption="Pokaż kod przy stoisku")
             
             if not (pd.isna(aktywna) or str(aktywna).strip() == ""):
                 st.warning(f"🎫 MASZ AKTYWNE KUPONY: **{aktywna}**")
@@ -194,16 +199,37 @@ elif menu == "Panel Sprzedawcy":
     pin = st.text_input("Hasło VIP:", type="password")
     if pin == "milosz2137":
         
+        st.subheader("📸 Szybki Skaner QR")
+        # Inicjalizacja zmiennej w sesji
+        if 'zeskanowany_kod' not in st.session_state:
+            st.session_state.zeskanowany_kod = ""
+            
+        img_file = st.camera_input("Skieruj aparat na kod QR klienta")
+        
+        if img_file:
+            file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
+            opencv_image = cv2.imdecode(file_bytes, 1)
+            
+            detector = cv2.QRCodeDetector()
+            data, bbox, straight_qrcode = detector.detectAndDecode(opencv_image)
+            
+            if data:
+                st.session_state.zeskanowany_kod = data
+                st.success(f"Odczytano kod: {data}")
+        
+        st.write("---")
         st.subheader("👥 Obsługa Klienta")
-        kod_input = st.text_input("Wpisz 5-cyfrowy kod klienta:")
+        
+        # Kod wstawia się automatycznie ze skanera
+        kod_input = st.text_input("Wpisz 5-cyfrowy kod klienta:", value=st.session_state.zeskanowany_kod)
         
         if kod_input:
             user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
             if not user_search.empty:
-                idx = user_search.index
-                klient = user_search['Nazwa'].iloc
-                punkty_klienta = user_search['Punkty'].iloc
-                kupon = user_search['Aktywna_Nagroda'].iloc
+                idx = user_search.index[0]
+                klient = user_search['Nazwa'].iloc[0]
+                punkty_klienta = user_search['Punkty'].iloc[0]
+                kupon = user_search['Aktywna_Nagroda'].iloc[0]
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
@@ -212,7 +238,6 @@ elif menu == "Panel Sprzedawcy":
                     st.warning(f"🔔 Klient chce odebrać: **{kupon_str}**")
                     lista_kuponow = [k.strip() for k in kupon_str.split(",") if k.strip()]
                     
-                    # POPRAWKA: Dodano enumerate() aby każdy przycisk miał unikalny klucz
                     for i, k in enumerate(lista_kuponow):
                         if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{i}_{idx}"):
                             lista_kuponow.pop(i)
@@ -248,7 +273,7 @@ elif menu == "Panel Sprzedawcy":
             if st.button("Zapisz Produkt w Ofercie"):
                 if p_name:
                     if p_name in oferta_df['Nagroda'].values:
-                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index
+                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index[0]
                         oferta_df.loc[ofer_idx, 'Koszt'] = p_cost
                         oferta_df.loc[ofer_idx, 'Sztuk'] = p_stock
                         st.success(f"Zaktualizowano produkt: {p_name}")
@@ -262,13 +287,24 @@ elif menu == "Panel Sprzedawcy":
                 else:
                     st.warning("Wpisz nazwę nagrody!")
                     
+        with st.expander("🗑️ Usuń Produkt z Oferty"):
+            delete_name = st.selectbox("Wybierz produkt do usunięcia:", oferta_df['Nagroda'].values)
+            if st.button("Usuń trwale ten produkt"):
+                oferta_df = oferta_df[oferta_df['Nagroda'] != delete_name]
+                save_products(oferta_df)
+                st.success(f"Usunięto produkt: {delete_name}")
+                st.rerun()
+                    
         st.subheader("Baza Klientów")
         st.dataframe(st.session_state.db)
 
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
+    # Naturalne wplecenie linku
+    st.write("Tworzę rzemieślnicze wypieki i ciekawe aplikacje!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
-    st.write("Wpadnij na mój kanał, by zobaczyć przygotowania!")
+    st.write("Zostaw subskrypcję, aby wesprzeć moje projekty.")
+
 
 
 
