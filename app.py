@@ -222,7 +222,7 @@ elif menu == "Panel Sprzedawcy":
                 
                 # DODAWANIE PUNKTÓW Z PRZELICZNIKIEM
                 st.write("---")
-                p_za_zl = 2 # PRZELICZNIK: 2 pkt za 1 zł
+                p_za_zl = 10 # PRZELICZNIK: 10 pkt za 1 zł
                 kwota = st.number_input("Kwota zakupu (zł):", min_value=1, value=10)
                 obliczone = kwota * p_za_zl
                 st.info(f"Doda: **{obliczone} Bąbelków**")
