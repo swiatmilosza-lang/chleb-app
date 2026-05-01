@@ -1,10 +1,10 @@
-import qrcode
 import streamlit as st
 import pandas as pd
 import random
 import os
 import cv2
 import numpy as np
+import qrcode
 
 # Konfiguracja VIP
 st.set_page_config(page_title="Bąbelkowa Aplikacja", page_icon="🥖")
@@ -136,59 +136,44 @@ if menu == "Mój Profil":
             with col_b:
                 st.metric("Twój Kod", kod)
             
-            # Kod QR dla klienta
-            qr_img = qrcode.make(str(kod))
-            st.image(qr_img.get_image(), width=150, caption="Pokaż kod przy stoisku")
-
+            # Kod QR wygenerowany lokalnie
+            qr = qrcode.make(str(kod))
+            st.image(qr.get_image(), width=180, caption="Pokaż kod przy stoisku")
             
             if not (pd.isna(aktywna) or str(aktywna).strip() == ""):
                 st.warning(f"🎫 MASZ AKTYWNE KUPONY: **{aktywna}**")
-                st.info("Pokaż kod 5-cyfrowy przy stoisku!")
+                st.info("Pokaż kod powyżej przy stoisku, aby odebrać nagrodę!")
 
             st.write("---")
             st.subheader("🎁 Aktywuj nagrodę za punkty:")
             
             oferta_df = load_products()
-            
             for index, row in oferta_df.iterrows():
                 nagroda = row['Nagroda']
                 koszt = row['Koszt']
-                sztuk = row['Sztuk']
+                s_sztuk = row['Sztuk']
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.write(f"**{nagroda}** ({koszt} Bąbelków)")
-                    if sztuk > 0:
-                        st.write(f"Zostało: {sztuk} szt.")
-                    else:
-                        st.write("🔴 BRAK SZTUK")
-                        
-                with col2:
-                    if sztuk > 0:
-                        if pkt >= koszt:
-                            typ = "primary"
-                            tekst = "🟢 Aktywuj"
-                        else:
-                            typ = "secondary"
-                            tekst = "Aktywuj"
-                        
-                        if st.button(tekst, key=f"kup_{nagroda}", type=typ):
+                c1, c2 = st.columns(2)
+                with c1:
+                    st.write(f"**{nagroda}** ({koszt} pkt)")
+                    st.write(f"Sztuk: {s_sztuk}" if s_sztuk > 0 else "🔴 BRAK")
+                with c2:
+                    if s_sztuk > 0:
+                        btn_typ = "primary" if pkt >= koszt else "secondary"
+                        if st.button(f"🟢 Aktywuj" if pkt >= koszt else "Aktywuj", key=f"k_{nagroda}", type=btn_typ):
                             if pkt >= koszt:
                                 st.session_state.db.loc[idx, 'Punkty'] -= koszt
                                 oferta_df.loc[index, 'Sztuk'] -= 1
                                 save_products(oferta_df)
-                                
-                                if pd.isna(aktywna) or str(aktywna).strip() == "":
-                                    st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
-                                else:
-                                    st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = f"{aktywna}, {nagroda}"
+                                stara_n = st.session_state.db.loc[idx, 'Aktywna_Nagroda']
+                                st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda if not stara_n else f"{stara_n}, {nagroda}"
                                 save_data(st.session_state.db)
-                                st.success(f"Aktywowano: {nagroda}!")
+                                st.success(f"Aktywowano {nagroda}!")
                                 st.rerun()
                             else:
-                                st.error("Za mało punktów!")
+                                st.error("Brak punktów!")
                     else:
-                        st.button("Wyprzedane", key=f"kup_{nagroda}", disabled=True)
+                        st.button("Wyprzedane", key=f"k_{nagroda}", disabled=True)
             
             st.write("---")
             if st.button("Wyloguj"):
@@ -202,111 +187,74 @@ elif menu == "Panel Sprzedawcy":
     pin = st.text_input("Hasło VIP:", type="password")
     if pin == "milosz2137":
         
-        st.subheader("📸 Szybki Skaner QR")
-        # Inicjalizacja zmiennej w sesji
-        if 'zeskanowany_kod' not in st.session_state:
-            st.session_state.zeskanowany_kod = ""
-            
-        img_file = st.camera_input("Skieruj aparat na kod QR klienta")
-        
-        if img_file:
-            file_bytes = np.asarray(bytearray(img_file.read()), dtype=np.uint8)
-            opencv_image = cv2.imdecode(file_bytes, 1)
-            
-            detector = cv2.QRCodeDetector()
-            data, bbox, straight_qrcode = detector.detectAndDecode(opencv_image)
-            
-            if data:
-                st.session_state.zeskanowany_kod = data
-                st.success(f"Odczytano kod: {data}")
-        
+        # SKANER
+        if 'last_scan' not in st.session_state: st.session_state.last_scan = ""
+        img = st.camera_input("Zeskanuj kod QR klienta")
+        if img:
+            f_bytes = np.asarray(bytearray(img.read()), dtype=np.uint8)
+            cv_img = cv2.imdecode(f_bytes, 1)
+            det = cv2.QRCodeDetector()
+            val, b, s = det.detectAndDecode(cv_img)
+            if val: 
+                st.session_state.last_scan = val
+                st.success(f"Skan OK: {val}")
+
         st.write("---")
-        st.subheader("👥 Obsługa Klienta")
+        kod_in = st.text_input("Kod klienta:", value=st.session_state.last_scan)
         
-        # Kod wstawia się automatycznie ze skanera
-        kod_input = st.text_input("Wpisz 5-cyfrowy kod klienta:", value=st.session_state.zeskanowany_kod)
-        
-        if kod_input:
-            user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
-            if not user_search.empty:
-                idx = user_search.index[0]
-                klient = user_search['Nazwa'].iloc[0]
-                punkty_klienta = user_search['Punkty'].iloc[0]
-                kupon = user_search['Aktywna_Nagroda'].iloc[0]
+        if kod_in:
+            search = st.session_state.db[st.session_state.db['Kod'] == kod_in]
+            if not search.empty:
+                s_idx = search.index[0]
+                st.write(f"**Klient:** {search['Nazwa'].iloc[0]} | **Punkty:** {search['Punkty'].iloc[0]}")
                 
-                st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
-                
-                kupon_str = str(kupon).strip()
-                if kupon_str != "" and not pd.isna(kupon):
-                    st.warning(f"🔔 Klient chce odebrać: **{kupon_str}**")
-                    lista_kuponow = [k.strip() for k in kupon_str.split(",") if k.strip()]
-                    
-                    for i, k in enumerate(lista_kuponow):
-                        if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{i}_{idx}"):
-                            lista_kuponow.pop(i)
-                            nowa_lista = ", ".join(lista_kuponow)
-                            st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nowa_lista
+                # Wydawanie nagród
+                kupony = str(search['Aktywna_Nagroda'].iloc[0]).strip()
+                if kupony:
+                    st.warning(f"Kupony: {kupony}")
+                    lista = [k.strip() for k in kupony.split(",") if k.strip()]
+                    for i, k in enumerate(lista):
+                        if st.button(f"Wydaj: {k}", key=f"w_{i}_{kod_in}"):
+                            lista.pop(i)
+                            st.session_state.db.loc[s_idx, 'Aktywna_Nagroda'] = ", ".join(lista)
                             save_data(st.session_state.db)
-                            st.success(f"Wydano {k}!")
                             st.rerun()
-                else:
-                    st.info("Brak aktywnych nagród.")
                 
+                # DODAWANIE PUNKTÓW Z PRZELICZNIKIEM
                 st.write("---")
-                ile_pkt = st.number_input("Dodaj punkty za zakupy:", value=10)
+                p_za_zl = 2 # PRZELICZNIK: 2 pkt za 1 zł
+                kwota = st.number_input("Kwota zakupu (zł):", min_value=1, value=10)
+                obliczone = kwota * p_za_zl
+                st.info(f"Doda: **{obliczone} Bąbelków**")
+                
                 if st.button("DODAJ PUNKTY"):
-                    st.session_state.db.loc[idx, 'Punkty'] += ile_pkt
+                    st.session_state.db.loc[s_idx, 'Punkty'] += obliczone
                     save_data(st.session_state.db)
-                    st.success(f"Dodano! Klient ma teraz {st.session_state.db.loc[idx, 'Punkty']} pkt.")
+                    st.success("Dodano!")
                     st.rerun()
             else:
-                st.error("Nie znaleziono takiego kodu.")
-        
+                st.error("Brak kodu!")
+
         st.write("---")
-        
-        st.subheader("🛒 Zarządzanie Ofertą (Magazyn)")
-        oferta_df = load_products()
-        st.dataframe(oferta_df)
-        
-        with st.expander("➕ Dodaj lub Edytuj Produkt"):
-            p_name = st.text_input("Nazwa nagrody:")
-            p_cost = st.number_input("Koszt (Bąbelki):", min_value=1, value=10)
-            p_stock = st.number_input("Ilość sztuk:", min_value=0, value=5)
-            
-            if st.button("Zapisz Produkt w Ofercie"):
-                if p_name:
-                    if p_name in oferta_df['Nagroda'].values:
-                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index[0]
-                        oferta_df.loc[ofer_idx, 'Koszt'] = p_cost
-                        oferta_df.loc[ofer_idx, 'Sztuk'] = p_stock
-                        st.success(f"Zaktualizowano produkt: {p_name}")
-                    else:
-                        nowy_p = pd.DataFrame([{'Nagroda': p_name, 'Koszt': p_cost, 'Sztuk': p_stock}])
-                        oferta_df = pd.concat([oferta_df, nowy_p], ignore_index=True)
-                        st.success(f"Dodano nowy produkt: {p_name}")
-                    
-                    save_products(oferta_df)
-                    st.rerun()
+        # ZARZĄDZANIE MAGAZYNEM
+        st.subheader("🛒 Magazyn i Oferta")
+        of_df = load_products()
+        st.dataframe(of_df)
+        with st.expander("Edytuj produkt"):
+            n_nazwa = st.text_input("Nazwa:")
+            n_koszt = st.number_input("Koszt (pkt):", value=10)
+            n_sztuk = st.number_input("Sztuk:", value=5)
+            if st.button("Zapisz"):
+                if n_nazwa in of_df['Nagroda'].values:
+                    of_df.loc[of_df['Nagroda'] == n_nazwa, ['Koszt', 'Sztuk']] = [n_koszt, n_sztuk]
                 else:
-                    st.warning("Wpisz nazwę nagrody!")
-                    
-        with st.expander("🗑️ Usuń Produkt z Oferty"):
-            delete_name = st.selectbox("Wybierz produkt do usunięcia:", oferta_df['Nagroda'].values)
-            if st.button("Usuń trwale ten produkt"):
-                oferta_df = oferta_df[oferta_df['Nagroda'] != delete_name]
-                save_products(oferta_df)
-                st.success(f"Usunięto produkt: {delete_name}")
-                st.rerun()
-                    
-        st.subheader("Baza Klientów")
-        st.dataframe(st.session_state.db)
+                    of_df = pd.concat([of_df, pd.DataFrame([{'Nagroda':n_nazwa,'Koszt':n_koszt,'Sztuk':n_sztuk}])])
+                save_products(of_df); st.rerun()
 
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
-    # Naturalne wplecenie linku
-    st.write("Tworzę rzemieślnicze wypieki i ciekawe aplikacje!")
-    st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
-    st.write("Zostaw subskrypcję, aby wesprzeć moje projekty.")
+    st.link_button("🔴 MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+
 
 
 
