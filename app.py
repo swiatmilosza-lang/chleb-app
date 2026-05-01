@@ -18,8 +18,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 DB_FILE = "baza_inzynier.csv"
+PRODUCTS_FILE = "oferta_inzynier.csv"
 
-# Funkcja ładowania danych
+# --- FUNKCJE BAZY DANYCH ---
 def load_data():
     kolumny = ['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty', 'Aktywna_Nagroda']
     if os.path.exists(DB_FILE):
@@ -32,6 +33,19 @@ def load_data():
 
 def save_data(df):
     df.to_csv(DB_FILE, index=False)
+
+def load_products():
+    if os.path.exists(PRODUCTS_FILE):
+        return pd.read_csv(PRODUCTS_FILE)
+    # Domyślna oferta na start
+    return pd.DataFrame([
+        {'Nagroda': 'Mini Pizza', 'Koszt': 30, 'Sztuk': 5},
+        {'Nagroda': 'Zakwas', 'Koszt': 50, 'Sztuk': 5},
+        {'Nagroda': 'Chleb', 'Koszt': 70, 'Sztuk': 5}
+    ])
+
+def save_products(df):
+    df.to_csv(PRODUCTS_FILE, index=False)
 
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
@@ -65,7 +79,7 @@ if menu == "Mój Profil":
             if st.button("Zaloguj się"):
                 user_row = st.session_state.db[st.session_state.db['Gmail'] == login_email]
                 if not user_row.empty:
-                    if str(user_row.iloc[0]['Haslo']) == str(login_pass):
+                    if str(user_row.iloc['Haslo']) == str(login_pass):
                         st.session_state.logged_in_email = login_email
                         st.query_params["user_email"] = login_email
                         st.rerun()
@@ -105,11 +119,11 @@ if menu == "Mój Profil":
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
-            idx = user_row.index[0]
-            name = user_row.iloc[0]['Nazwa']
-            kod = user_row.iloc[0]['Kod']
-            pkt = user_row.iloc[0]['Punkty']
-            aktywna = user_row.iloc[0]['Aktywna_Nagroda']
+            idx = user_row.index
+            name = user_row.iloc['Nazwa']
+            kod = user_row.iloc['Kod']
+            pkt = user_row.iloc['Punkty']
+            aktywna = user_row.iloc['Aktywna_Nagroda']
             
             st.header(f"Witaj, {name}!")
             col_a, col_b = st.columns(2)
@@ -126,33 +140,50 @@ if menu == "Mój Profil":
             st.write("---")
             st.subheader("🎁 Aktywuj nagrodę za punkty:")
             
-            cennik = {"Mini Pizza": 30, "Zakwas": 50, "Chleb": 70}
+            # Wczytywanie dynamicznej listy nagród
+            oferta_df = load_products()
             
-            for nagroda, koszt in cennik.items():
+            for index, row in oferta_df.iterrows():
+                nagroda = row['Nagroda']
+                koszt = row['Koszt']
+                sztuk = row['Sztuk']
+                
                 col1, col2 = st.columns(2)
                 with col1:
                     st.write(f"**{nagroda}** ({koszt} Bąbelków)")
-                with col2:
-                    if pkt >= koszt:
-                        typ = "primary"
-                        tekst = "🟢 Aktywuj"
+                    if sztuk > 0:
+                        st.write(f"Zostało: {sztuk} szt.")
                     else:
-                        typ = "secondary"
-                        tekst = "Aktywuj"
-                    
-                    if st.button(tekst, key=f"kup_{nagroda}", type=typ):
+                        st.write("🔴 BRAK SZTUK")
+                        
+                with col2:
+                    if sztuk > 0:
                         if pkt >= koszt:
-                            st.session_state.db.loc[idx, 'Punkty'] -= koszt
-                            # Dopisywanie kolejnego kuponu do listy
-                            if pd.isna(aktywna) or aktywna == "":
-                                st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
-                            else:
-                                st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = f"{aktywna}, {nagroda}"
-                            save_data(st.session_state.db)
-                            st.success(f"Aktywowano: {nagroda}!")
-                            st.rerun()
+                            typ = "primary"
+                            tekst = "🟢 Aktywuj"
                         else:
-                            st.error("Za mało punktów!")
+                            typ = "secondary"
+                            tekst = "Aktywuj"
+                        
+                        if st.button(tekst, key=f"kup_{nagroda}", type=typ):
+                            if pkt >= koszt:
+                                # Pobieranie punktów i sztuk
+                                st.session_state.db.loc[idx, 'Punkty'] -= koszt
+                                oferta_df.loc[index, 'Sztuk'] -= 1
+                                save_products(oferta_df)
+                                
+                                # Dopisywanie kuponu
+                                if pd.isna(aktywna) or aktywna == "":
+                                    st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
+                                else:
+                                    st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = f"{aktywna}, {nagroda}"
+                                save_data(st.session_state.db)
+                                st.success(f"Aktywowano: {nagroda}!")
+                                st.rerun()
+                            else:
+                                st.error("Za mało punktów!")
+                    else:
+                        st.button("Wyprzedane", key=f"kup_{nagroda}", disabled=True)
             
             st.write("---")
             if st.button("Wyloguj"):
@@ -165,19 +196,21 @@ elif menu == "Panel Sprzedawcy":
     st.header("Panel Admina")
     pin = st.text_input("Hasło VIP:", type="password")
     if pin == "milosz2137":
+        
+        # --- ZAKŁADKA 1: OBSŁUGA KLIENTA ---
+        st.subheader("👥 Obsługa Klienta")
         kod_input = st.text_input("Wpisz 5-cyfrowy kod klienta:")
         
         if kod_input:
             user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
             if not user_search.empty:
-                idx = user_search.index[0]
-                klient = user_search.iloc[0]['Nazwa']
-                punkty_klienta = user_search.iloc[0]['Punkty']
-                kupon = user_search.iloc[0]['Aktywna_Nagroda']
+                idx = user_search.index
+                klient = user_search.iloc['Nazwa']
+                punkty_klienta = user_search.iloc['Punkty']
+                kupon = user_search.iloc['Aktywna_Nagroda']
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
-                # Wydawanie wielu kuponów pojedynczo
                 if kupon and kupon != "":
                     st.warning(f"🔔 Klient chce odebrać: **{kupon}**")
                     lista_kuponow = [k.strip() for k in kupon.split(",")]
@@ -203,15 +236,45 @@ elif menu == "Panel Sprzedawcy":
             else:
                 st.error("Nie znaleziono takiego kodu.")
         
+        st.write("---")
+        
+        # --- ZAKŁADKA 2: ZARZĄDZANIE OFERTĄ ---
+        st.subheader("🛒 Zarządzanie Ofertą (Magazyn)")
+        oferta_df = load_products()
+        st.dataframe(oferta_df)
+        
+        with st.expander("➕ Dodaj lub Edytuj Produkt"):
+            p_name = st.text_input("Nazwa nagrody:")
+            p_cost = st.number_input("Koszt (Bąbelki):", min_value=1, value=10)
+            p_stock = st.number_input("Ilość sztuk:", min_value=0, value=5)
+            
+            if st.button("Zapisz Produkt w Ofercie"):
+                if p_name:
+                    if p_name in oferta_df['Nagroda'].values:
+                        # Aktualizacja istniejącego produktu
+                        oferta_df.loc[oferta_df['Nagroda'] == p_name, 'Koszt'] = p_cost
+                        oferta_df.loc[oferta_df['Nagroda'] == p_name, 'Sztuk'] = p_stock
+                        st.success(f"Zaktualizowano produkt: {p_name}")
+                    else:
+                        # Dodawanie nowego produktu
+                        nowy_p = pd.DataFrame([{'Nagroda': p_name, 'Koszt': p_cost, 'Sztuk': p_stock}])
+                        oferta_df = pd.concat([oferta_df, nowy_p], ignore_index=True)
+                        st.success(f"Dodano nowy produkt: {p_name}")
+                    
+                    save_products(oferta_df)
+                    st.rerun()
+                else:
+                    st.warning("Wpisz nazwę nagrody!")
+                    
         st.subheader("Baza Klientów")
         st.dataframe(st.session_state.db)
 
 # --- SEKCJA: YOUTUBE & INFO ---
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
-    # Link zintegrowany z przyciskiem
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
-    st.write("Wpadnij na kanał, by zobaczyć przygotowania!")
+    st.write("Wpadnij na [mój kanał](https://www.youtube.com/@inzynierwypieku), by zobaczyć przygotowania!")
+
 
 
 
