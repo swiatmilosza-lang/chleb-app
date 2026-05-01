@@ -33,7 +33,7 @@ elif "logged_in_email" not in st.session_state:
     st.session_state.logged_in_email = None
 
 # INTERFEJS
-st.title("🥖 Chleb-App VIP")
+st.title("🥖 Bąbelkowa Aplikacja")
 menu = st.sidebar.radio("Menu", ["Mój Profil", "Panel Sprzedawcy", "YouTube & Info"])
 
 if menu == "Mój Profil":
