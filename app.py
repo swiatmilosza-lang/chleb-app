@@ -6,7 +6,7 @@ import os
 # Konfiguracja VIP
 st.set_page_config(page_title="Chleb-App VIP", page_icon="🥖")
 
-DB_FILE = "baza_v3.csv"
+DB_FILE = "baza_finalna.csv"
 
 # Funkcja ładowania danych - WERSJA SAMONAPRAWCZA
 def load_data():
