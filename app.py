@@ -73,7 +73,6 @@ if menu == "Mój Profil":
     if st.session_state.logged_in_email is None:
         st.header("Zaloguj się lub załóż konto")
         tab1, tab2 = st.tabs(["Logowanie", "Rejestracja"])
-        
         with tab1:
             st.subheader("Zaloguj się")
             l_email = st.text_input("Twój Gmail:", key="l_email")
@@ -87,7 +86,6 @@ if menu == "Mój Profil":
                         st.rerun()
                     else: st.error("Błędne hasło!")
                 else: st.error("Brak konta.")
-        
         with tab2:
             st.subheader("Nowe konto (+50 Bąbelków!)")
             n_name = st.text_input("Imię:")
@@ -104,25 +102,18 @@ if menu == "Mój Profil":
                         st.query_params["user_email"] = n_email
                         st.success("Witaj!"); st.balloons(); st.rerun()
                     else: st.error("E-mail zajęty.")
-
     else:
         u_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not u_row.empty:
             idx = u_row.index
             name, kod, pkt, aktywna = u_row['Nazwa'].iloc[0], u_row['Kod'].iloc[0], u_row['Punkty'].iloc[0], u_row['Aktywna_Nagroda'].iloc[0]
-            
             st.header(f"Witaj, {name}!")
             c_a, c_b = st.columns(2)
             c_a.metric("Bąbelki", f"{pkt}")
             c_b.metric("Twój Kod", kod)
-            
-            # QR lokalny
             qr = qrcode.make(str(kod))
             st.image(qr.get_image(), width=180, caption="Pokaż kod przy stoisku")
-            
-            if aktywna:
-                st.warning(f"🎫 MASZ KUPONY: {aktywna}")
-
+            if aktywna: st.warning(f"🎫 MASZ KUPONY: {aktywna}")
             st.write("---")
             st.subheader("🎁 Aktywuj nagrodę:")
             o_df = load_products()
@@ -144,7 +135,6 @@ if menu == "Mój Profil":
                                 save_data(st.session_state.db)
                                 st.success(f"Aktywowano!"); st.rerun()
                     else: st.button("Wyprzedane", key=f"k_{r['Nagroda']}", disabled=True)
-            
             if st.button("Wyloguj"):
                 st.session_state.logged_in_email = None
                 st.query_params.clear(); st.rerun()
@@ -154,7 +144,6 @@ elif menu == "Panel Sprzedawcy":
     st.header("Panel Admina")
     pin = st.text_input("Hasło VIP:", type="password")
     if pin == "milosz2137":
-        # Skaner
         if 'last_scan' not in st.session_state: st.session_state.last_scan = ""
         img = st.camera_input("Zeskanuj kod QR")
         if img:
@@ -164,7 +153,6 @@ elif menu == "Panel Sprzedawcy":
             if val: 
                 st.session_state.last_scan = val
                 st.success(f"Odczytano: {val}")
-
         st.write("---")
         k_in = st.text_input("Kod klienta:", value=st.session_state.last_scan)
         if k_in:
@@ -172,8 +160,6 @@ elif menu == "Panel Sprzedawcy":
             if not search.empty:
                 s_idx = search.index
                 st.write(f"**Klient:** {search['Nazwa'].iloc[0]} | **Punkty:** {search['Punkty'].iloc[0]}")
-                
-                # Wydawanie
                 k_str = str(search['Aktywna_Nagroda'].iloc[0]).strip()
                 if k_str:
                     lista = [k.strip() for k in k_str.split(",") if k.strip()]
@@ -182,8 +168,6 @@ elif menu == "Panel Sprzedawcy":
                             lista.pop(i)
                             st.session_state.db.loc[s_idx, 'Aktywna_Nagroda'] = ", ".join(lista)
                             save_data(st.session_state.db); st.rerun()
-                
-                # Punkty (1zł = 10pkt)
                 st.write("---")
                 p_za_zl = 10
                 kwota = st.number_input("Kwota (zł):", min_value=1, value=10)
@@ -191,24 +175,34 @@ elif menu == "Panel Sprzedawcy":
                 if st.button("DODAJ PUNKTY"):
                     st.session_state.db.loc[s_idx, 'Punkty'] += (kwota * p_za_zl)
                     save_data(st.session_state.db); st.success("Dodano!"); st.rerun()
-
         st.write("---")
         st.subheader("🛒 Magazyn i Oferta")
         of_df = load_products()
         st.dataframe(of_df)
-        with st.expander("➕ Edytuj ofertę"):
-            n_naz = st.text_input("Produkt:")
+        with st.expander("➕ Dodaj/Edytuj Produkt (Koszt i Sztuki)"):
+            n_naz = st.text_input("Nazwa produktu (musi być identyczna jak w tabeli, by zmienić koszt/sztuki):")
             n_kos = st.number_input("Koszt:", value=100)
             n_szt = st.number_input("Sztuk:", value=10)
-            if st.button("Zapisz produkt"):
+            if st.button("Zapisz parametry"):
                 if n_naz in of_df['Nagroda'].values:
                     of_df.loc[of_df['Nagroda'] == n_naz, ['Koszt', 'Sztuk']] = [n_kos, n_szt]
                 else:
                     of_df = pd.concat([of_df, pd.DataFrame([{'Nagroda':n_naz,'Koszt':n_kos,'Sztuk':n_szt}])])
                 save_products(of_df); st.rerun()
+        
+        with st.expander("✏️ Zmień TYLKO NAZWĘ istniejącego produktu"):
+            if not of_df.empty:
+                stary_n = st.selectbox("Wybierz produkt do zmiany nazwy:", of_df['Nagroda'].values)
+                nowy_n = st.text_input("Nowa nazwa dla tego produktu:")
+                if st.button("Aktualizuj nazwę"):
+                    if nowy_n:
+                        of_df.loc[of_df['Nagroda'] == stary_n, 'Nagroda'] = nowy_n
+                        save_products(of_df); st.success(f"Zmieniono nazwę na {nowy_n}!"); st.rerun()
+                    else: st.warning("Wpisz nową nazwę!")
+
         with st.expander("🗑️ Usuń produkt"):
             if not of_df.empty:
-                del_p = st.selectbox("Co usunąć?", of_df['Nagroda'].values)
+                del_p = st.selectbox("Co usunąć?", of_df['Nagroda'].values, key="del_p_select")
                 if st.button("Potwierdź usunięcie produktu"):
                     of_df = of_df[of_df['Nagroda'] != del_p]
                     save_products(of_df); st.rerun()
@@ -227,6 +221,7 @@ elif menu == "Panel Sprzedawcy":
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+
 
 
 
