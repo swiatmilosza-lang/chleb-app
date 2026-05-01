@@ -28,7 +28,6 @@ def load_data():
         for col in kolumny:
             if col not in df.columns:
                 df[col] = "" if col == 'Aktywna_Nagroda' else (0 if col == 'Punkty' else "")
-        # Zamiana wartości NaN w kolumnie Aktywna_Nagroda na pusty tekst
         df['Aktywna_Nagroda'] = df['Aktywna_Nagroda'].fillna("")
         return df[kolumny]
     return pd.DataFrame(columns=kolumny)
@@ -80,7 +79,7 @@ if menu == "Mój Profil":
             if st.button("Zaloguj się"):
                 user_row = st.session_state.db[st.session_state.db['Gmail'] == login_email]
                 if not user_row.empty:
-                    poprawne_haslo = str(user_row['Haslo'].iloc[0])
+                    poprawne_haslo = str(user_row['Haslo'].iloc)
                     if poprawne_haslo == str(login_pass):
                         st.session_state.logged_in_email = login_email
                         st.query_params["user_email"] = login_email
@@ -121,11 +120,11 @@ if menu == "Mój Profil":
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
-            idx = user_row.index[0]
-            name = user_row['Nazwa'].iloc[0]
-            kod = user_row['Kod'].iloc[0]
-            pkt = user_row['Punkty'].iloc[0]
-            aktywna = user_row['Aktywna_Nagroda'].iloc[0]
+            idx = user_row.index
+            name = user_row['Nazwa'].iloc
+            kod = user_row['Kod'].iloc
+            pkt = user_row['Punkty'].iloc
+            aktywna = user_row['Aktywna_Nagroda'].iloc
             
             st.header(f"Witaj, {name}!")
             col_a, col_b = st.columns(2)
@@ -201,22 +200,22 @@ elif menu == "Panel Sprzedawcy":
         if kod_input:
             user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
             if not user_search.empty:
-                idx = user_search.index[0]
-                klient = user_search['Nazwa'].iloc[0]
-                punkty_klienta = user_search['Punkty'].iloc[0]
-                kupon = user_search['Aktywna_Nagroda'].iloc[0]
+                idx = user_search.index
+                klient = user_search['Nazwa'].iloc
+                punkty_klienta = user_search['Punkty'].iloc
+                kupon = user_search['Aktywna_Nagroda'].iloc
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
-                # POPRAWKA BŁĘDU SPLIT
                 kupon_str = str(kupon).strip()
                 if kupon_str != "" and not pd.isna(kupon):
                     st.warning(f"🔔 Klient chce odebrać: **{kupon_str}**")
                     lista_kuponow = [k.strip() for k in kupon_str.split(",") if k.strip()]
                     
-                    for k in lista_kuponow:
-                        if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{idx}"):
-                            lista_kuponow.remove(k)
+                    # POPRAWKA: Dodano enumerate() aby każdy przycisk miał unikalny klucz
+                    for i, k in enumerate(lista_kuponow):
+                        if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{i}_{idx}"):
+                            lista_kuponow.pop(i)
                             nowa_lista = ", ".join(lista_kuponow)
                             st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nowa_lista
                             save_data(st.session_state.db)
@@ -249,7 +248,7 @@ elif menu == "Panel Sprzedawcy":
             if st.button("Zapisz Produkt w Ofercie"):
                 if p_name:
                     if p_name in oferta_df['Nagroda'].values:
-                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index[0]
+                        ofer_idx = oferta_df[oferta_df['Nagroda'] == p_name].index
                         oferta_df.loc[ofer_idx, 'Koszt'] = p_cost
                         oferta_df.loc[ofer_idx, 'Sztuk'] = p_stock
                         st.success(f"Zaktualizowano produkt: {p_name}")
@@ -270,6 +269,7 @@ elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
     st.write("Wpadnij na mój kanał, by zobaczyć przygotowania!")
+
 
 
 
