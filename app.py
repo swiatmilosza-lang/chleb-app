@@ -171,7 +171,7 @@ elif menu == "Panel Sprzedawcy":
         st.dataframe(st.session_state.db)
 
 elif menu == "YouTube & Info":
-    st.header("Subskrybuj światmilosza-lang!")
+    st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
 
 
