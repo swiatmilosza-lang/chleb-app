@@ -79,7 +79,9 @@ if menu == "Mój Profil":
             if st.button("Zaloguj się"):
                 user_row = st.session_state.db[st.session_state.db['Gmail'] == login_email]
                 if not user_row.empty:
-                    if str(user_row.iloc['Haslo']) == str(login_pass):
+                    # Poprawione pobieranie hasła
+                    poprawne_haslo = str(user_row['Haslo'].iloc[0])
+                    if poprawne_haslo == str(login_pass):
                         st.session_state.logged_in_email = login_email
                         st.query_params["user_email"] = login_email
                         st.rerun()
@@ -112,18 +114,19 @@ if menu == "Mój Profil":
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("Ten adres Gmail jest już zajęty.")
+                        st.error("Ten adres Gmail jest już zarejestrowany.")
                 else:
                     st.warning("Wypełnij wszystkie pola!")
 
     else:
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
-            idx = user_row.index
-            name = user_row.iloc['Nazwa']
-            kod = user_row.iloc['Kod']
-            pkt = user_row.iloc['Punkty']
-            aktywna = user_row.iloc['Aktywna_Nagroda']
+            # --- POPRAWIONE INDEKSOWANIE PANDAS ---
+            idx = user_row.index[0]
+            name = user_row['Nazwa'].iloc[0]
+            kod = user_row['Kod'].iloc[0]
+            pkt = user_row['Punkty'].iloc[0]
+            aktywna = user_row['Aktywna_Nagroda'].iloc[0]
             
             st.header(f"Witaj, {name}!")
             col_a, col_b = st.columns(2)
@@ -204,13 +207,15 @@ elif menu == "Panel Sprzedawcy":
         if kod_input:
             user_search = st.session_state.db[st.session_state.db['Kod'] == kod_input]
             if not user_search.empty:
-                idx = user_search.index
-                klient = user_search.iloc['Nazwa']
-                punkty_klienta = user_search.iloc['Punkty']
-                kupon = user_search.iloc['Aktywna_Nagroda']
+                # --- POPRAWIONE INDEKSOWANIE PANDAS ---
+                idx = user_search.index[0]
+                klient = user_search['Nazwa'].iloc[0]
+                punkty_klienta = user_search['Punkty'].iloc[0]
+                kupon = user_search['Aktywna_Nagroda'].iloc[0]
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
+                # Wydawanie wielu kuponów pojedynczo
                 if kupon and kupon != "":
                     st.warning(f"🔔 Klient chce odebrać: **{kupon}**")
                     lista_kuponow = [k.strip() for k in kupon.split(",")]
@@ -273,7 +278,8 @@ elif menu == "Panel Sprzedawcy":
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
-    st.write("Wpadnij na [mój kanał](https://www.youtube.com/@inzynierwypieku), by zobaczyć przygotowania!")
+    st.write("Wpadnij na mój kanał, by zobaczyć przygotowania!")
+
 
 
 
