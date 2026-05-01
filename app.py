@@ -114,8 +114,8 @@ if menu == "Mój Profil":
             
             # Tworzymy tabelę z nagrodami
             nagrody = {
-                "Nagroda": ["E-book z przepisem", "Mini Pizza", "Słoiczek Zakwasu", "Chleb Pszenno-Żytni", "Złoty Bochenek"],
-                "Koszt (Bąbelki)": [10, 30, 50, 70, 100]
+                "Nagroda": ["Mini Pizza", "Słoiczek Zakwasu", "Chleb Pszenno-Żytni", "Złoty Bochenek"],
+                "Koszt (Bąbelki)": [30, 50, 70, 100]
             }
             df_nagrody = pd.DataFrame(nagrody)
             
