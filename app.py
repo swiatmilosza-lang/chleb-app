@@ -121,10 +121,10 @@ if menu == "Mój Profil":
         user_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not user_row.empty:
             idx = user_row.index
-            name = user_row['Nazwa'].iloc
-            kod = user_row['Kod'].iloc
-            pkt = user_row['Punkty'].iloc
-            aktywna = user_row['Aktywna_Nagroda'].iloc
+            name = user_row['Nazwa'].iloc[0]
+            kod = user_row['Kod'].iloc[0]
+            pkt = user_row['Punkty'].iloc[0]
+            aktywna = user_row['Aktywna_Nagroda'].iloc[0]
             
             st.header(f"Witaj, {name}!")
             col_a, col_b = st.columns(2)
