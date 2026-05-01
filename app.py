@@ -133,7 +133,7 @@ elif menu == "Panel Sprzedawcy":
         st.subheader("🛒 Zarządzanie Magazynem")
         of_df = load_products()
         
-                with st.expander("➕ Dodaj Produkt i ZDJĘCIE"):
+        with st.expander("➕ Dodaj Produkt i ZDJĘCIE"):
             n_naz = st.text_input("Nazwa produktu (np. Chleb):")
             n_kos = st.number_input("Koszt (w Bąbelkach):", value=100)
             n_szt = st.number_input("Ile masz sztuk:", value=10)
