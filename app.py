@@ -8,11 +8,18 @@ st.set_page_config(page_title="Chleb-App VIP", page_icon="🥖")
 
 DB_FILE = "baza_v3.csv"
 
-# Funkcja ładowania danych (dodaliśmy kolumny Gmail i Haslo)
+# Funkcja ładowania danych - WERSJA SAMONAPRAWCZA
 def load_data():
+    kolumny = ['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty']
     if os.path.exists(DB_FILE):
-        return pd.read_csv(DB_FILE, dtype={'Kod': str, 'Haslo': str})
-    return pd.DataFrame(columns=['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty'])
+        df = pd.read_csv(DB_FILE, dtype={'Kod': str, 'Haslo': str})
+        # Sprawdź, czy brakuje jakichś kolumn (np. Gmail) i dodaj je, jeśli trzeba
+        for col in kolumny:
+            if col not in df.columns:
+                df[col] = "" # Dodaje pusta kolumne, jesli jej nie ma
+        return df[kolumny] # Zwraca tylko poprawne kolumny
+    return pd.DataFrame(columns=kolumny)
+
 
 # Funkcja zapisu danych
 def save_data(df):
