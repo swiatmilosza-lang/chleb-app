@@ -6,7 +6,7 @@ import os
 # Konfiguracja VIP
 st.set_page_config(page_title="Bąbelkowa Aplikacja", page_icon="🥖")
 
-# STYL CSS - Robi przycisk primary na zielono
+# Styl CSS dla zielonych przycisków
 st.markdown("""
     <style>
     div.stButton > button[kind="primary"] {
@@ -19,7 +19,7 @@ st.markdown("""
 
 DB_FILE = "baza_inzynier.csv"
 
-# Funkcja ładowania danych (Wersja samonaprawcza)
+# Funkcja ładowania danych
 def load_data():
     kolumny = ['Nazwa', 'Gmail', 'Haslo', 'Kod', 'Punkty', 'Aktywna_Nagroda']
     if os.path.exists(DB_FILE):
@@ -36,7 +36,7 @@ def save_data(df):
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
-# LOGIKA AUTOMATYCZNEGO LOGOWANIA (Zabezpieczona)
+# Logika automatycznego logowania
 if "user_email" in st.query_params:
     email_z_linku = st.query_params["user_email"]
     if email_z_linku in st.session_state.db['Gmail'].values:
@@ -47,10 +47,11 @@ if "user_email" in st.query_params:
 elif "logged_in_email" not in st.session_state:
     st.session_state.logged_in_email = None
 
-# INTERFEJS
+# Menu boczne
 st.title("🥖 Bąbelkowa Aplikacja")
 menu = st.sidebar.radio("Menu", ["Mój Profil", "Panel Sprzedawcy", "YouTube & Info"])
 
+# --- SEKCJA: MÓJ PROFIL ---
 if menu == "Mój Profil":
     if st.session_state.logged_in_email is None:
         st.header("Zaloguj się lub załóż konto")
@@ -71,14 +72,14 @@ if menu == "Mój Profil":
                     else:
                         st.error("Błędne hasło!")
                 else:
-                    st.error("Nie znaleziono konta z tym adresem Gmail.")
+                    st.error("Nie znaleziono konta.")
         
         with tab2:
             st.subheader("Załóż nowe konto")
             st.warning("⚠️ NIE wpisuj tu swojego prawdziwego hasła do Gmaila!")
             new_name = st.text_input("Twoje Imię:")
             new_email = st.text_input("Twój Gmail:")
-            new_pass = st.text_input("Wymyśl hasło do apki:", type="password")
+            new_pass = st.text_input("Hasło do apki:", type="password")
             
             if st.button("Zarejestruj mnie (+5 pkt!)"):
                 if new_name and new_email and new_pass:
@@ -97,7 +98,7 @@ if menu == "Mój Profil":
                         st.balloons()
                         st.rerun()
                     else:
-                        st.error("Ten adres Gmail jest już zarejestrowany.")
+                        st.error("Ten adres Gmail jest już zajęty.")
                 else:
                     st.warning("Wypełnij wszystkie pola!")
 
@@ -117,37 +118,41 @@ if menu == "Mój Profil":
             with col_b:
                 st.metric("Twój Kod", kod)
             
-            if pd.isna(aktywna) or aktywna == "":
-                st.write("---")
-                st.subheader("🎁 Aktywuj nagrodę za punkty:")
-                
-                cennik = {"Mini Pizza": 30, "Zakwas": 50, "Chleb": 70}
-                
-                for nagroda, koszt in cennik.items():
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.write(f"**{nagroda}** ({koszt} Bąbelków)")
-                    with col2:
-                        # Zielony przycisk gdy stać klienta
+            # Wyświetlanie aktywnych kuponów
+            if not (pd.isna(aktywna) or aktywna == ""):
+                st.warning(f"🎫 MASZ AKTYWNE KUPONY: **{aktywna}**")
+                st.info("Pokaż kod 5-cyfrowy przy stoisku!")
+
+            st.write("---")
+            st.subheader("🎁 Aktywuj nagrodę za punkty:")
+            
+            cennik = {"Mini Pizza": 30, "Zakwas": 50, "Chleb": 70}
+            
+            for nagroda, koszt in cennik.items():
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.write(f"**{nagroda}** ({koszt} Bąbelków)")
+                with col2:
+                    if pkt >= koszt:
+                        typ = "primary"
+                        tekst = "🟢 Aktywuj"
+                    else:
+                        typ = "secondary"
+                        tekst = "Aktywuj"
+                    
+                    if st.button(tekst, key=f"kup_{nagroda}", type=typ):
                         if pkt >= koszt:
-                            typ = "primary"
-                            tekst = "🟢 Aktywuj"
-                        else:
-                            typ = "secondary"
-                            tekst = "Aktywuj"
-                        
-                        if st.button(tekst, key=nagroda, type=typ):
-                            if pkt >= koszt:
-                                st.session_state.db.loc[idx, 'Punkty'] -= koszt
+                            st.session_state.db.loc[idx, 'Punkty'] -= koszt
+                            # Dopisywanie kolejnego kuponu do listy
+                            if pd.isna(aktywna) or aktywna == "":
                                 st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nagroda
-                                save_data(st.session_state.db)
-                                st.success(f"Aktywowano: {nagroda}!")
-                                st.rerun()
                             else:
-                                st.error("Za mało punktów!")
-            else:
-                st.warning(f"🎫 MASZ AKTYWNY KUPON NA: **{aktywna}**")
-                st.info("Pokaż swój kod 5-cyfrowy przy stoisku, aby odebrać nagrodę!")
+                                st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = f"{aktywna}, {nagroda}"
+                            save_data(st.session_state.db)
+                            st.success(f"Aktywowano: {nagroda}!")
+                            st.rerun()
+                        else:
+                            st.error("Za mało punktów!")
             
             st.write("---")
             if st.button("Wyloguj"):
@@ -155,6 +160,7 @@ if menu == "Mój Profil":
                 st.query_params.clear()
                 st.rerun()
 
+# --- SEKCJA: PANEL SPRZEDAWCY ---
 elif menu == "Panel Sprzedawcy":
     st.header("Panel Admina")
     pin = st.text_input("Hasło VIP:", type="password")
@@ -171,15 +177,21 @@ elif menu == "Panel Sprzedawcy":
                 
                 st.write(f"**Klient:** {klient} | **Punkty:** {punkty_klienta}")
                 
+                # Wydawanie wielu kuponów pojedynczo
                 if kupon and kupon != "":
                     st.warning(f"🔔 Klient chce odebrać: **{kupon}**")
-                    if st.button("Wydaj nagrodę (Kasuje kupon)"):
-                        st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = ""
-                        save_data(st.session_state.db)
-                        st.success("Wydano nagrodę!")
-                        st.rerun()
+                    lista_kuponow = [k.strip() for k in kupon.split(",")]
+                    
+                    for k in lista_kuponow:
+                        if st.button(f"Wydaj: {k}", key=f"wydaj_{k}_{idx}"):
+                            lista_kuponow.remove(k)
+                            nowa_lista = ", ".join(lista_kuponow)
+                            st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = nowa_lista
+                            save_data(st.session_state.db)
+                            st.success(f"Wydano {k}!")
+                            st.rerun()
                 else:
-                    st.info("Klient nie ma aktywowanych nagród.")
+                    st.info("Brak aktywnych nagród.")
                 
                 st.write("---")
                 ile_pkt = st.number_input("Dodaj punkty za zakupy:", value=10)
@@ -194,9 +206,13 @@ elif menu == "Panel Sprzedawcy":
         st.subheader("Baza Klientów")
         st.dataframe(st.session_state.db)
 
+# --- SEKCJA: YOUTUBE & INFO ---
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
+    # Link zintegrowany z przyciskiem
     st.link_button("🔴 WEJDŹ NA MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+    st.write("Wpadnij na kanał, by zobaczyć przygotowania!")
+
 
 
 
