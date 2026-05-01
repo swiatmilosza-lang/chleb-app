@@ -108,6 +108,28 @@ if menu == "Mój Profil":
             st.metric("Twoje Zapasy", f"{pkt} Bąbelków")
             st.subheader(f"Twój Kod: {kod}")
             st.info("Pokaż ten kod przy stoisku, aby dostać punkty!")
+                        # --- SEKCJA NAGRÓD ---
+            st.write("---")
+            st.subheader("🎁 Twoje Nagrody")
+            
+            # Tworzymy tabelę z nagrodami
+            nagrody = {
+                "Nagroda": ["E-book z przepisem", "Mini Pizza", "Słoiczek Zakwasu", "Chleb Pszenno-Żytni", "Złoty Bochenek"],
+                "Koszt (Bąbelki)": [10, 30, 50, 70, 100]
+            }
+            df_nagrody = pd.DataFrame(nagrody)
+            
+            # Wyświetlamy nagrody
+            st.table(df_nagrody)
+            
+            # Podpowiedź dla klienta
+            if pkt >= 100:
+                st.success("Osiągnąłeś poziom VIP! Możesz odebrać Złoty Bochenek! 🏆")
+            elif pkt >= 50:
+                st.warning("Masz już punkty na świeży zakwas! 🥖")
+            else:
+                st.write(f"Brakuje Ci {30 - pkt if pkt < 30 else 50 - pkt} pkt do kolejnej nagrody!")
+
             
             if st.button("Wyloguj (Zmień konto)"):
                 st.session_state.logged_in_email = None
