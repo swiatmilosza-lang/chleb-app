@@ -1,6 +1,0 @@
-streamlit
-pandas
-opencv
-python
-headless
-
