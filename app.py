@@ -130,7 +130,7 @@ if menu == "Mój Profil":
 elif menu == "Panel Sprzedawcy":
         pin = st.text_input("Hasło VIP:", type="password")
         if pin == "milosz2137":
-        st.subheader("📸 Szybki Skaner QR")
+            st.subheader("📸 Szybki Skaner QR")
         
         # Inicjalizacja pamięci skanu, jeśli nie istnieje
         if 'last_scan' not in st.session_state:
