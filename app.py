@@ -252,6 +252,16 @@ elif menu == "Panel Sprzedawcy":
             p_name = st.text_input("Nazwa nagrody:")
             p_cost = st.number_input("Koszt (Bąbelki):", min_value=1, value=10)
             p_stock = st.number_input("Ilość sztuk:", min_value=0, value=5)
+                    
+        with st.expander("🗑️ Usuń Produkt z Oferty"):
+            delete_name = st.selectbox("Wybierz produkt do usunięcia:", oferta_df['Nagroda'].values)
+            if st.button("Usuń trwale ten produkt"):
+                # Usuwanie produktu z tabeli
+                oferta_df = oferta_df[oferta_df['Nagroda'] != delete_name]
+                save_products(oferta_df)
+                st.success(f"Usunięto produkt: {delete_name}")
+                st.rerun()
+
             
             if st.button("Zapisz Produkt w Ofercie"):
                 if p_name:
