@@ -26,9 +26,18 @@ def save_data(df):
 if 'db' not in st.session_state:
     st.session_state.db = load_data()
 
-# LOGIKA AUTOMATYCZNEGO LOGOWANIA
+# LOGIKA AUTOMATYCZNEGO LOGOWANIA (POPRAWIONA)
 if "user_email" in st.query_params:
-    st.session_state.logged_in_email = st.query_params["user_email"]
+    email_z_linku = st.query_params["user_email"]
+    # Sprawdzamy czy ten email faktycznie jest w bazie
+    if email_z_linku in st.session_state.db['Gmail'].values:
+        st.session_state.logged_in_email = email_z_linku
+    else:
+        st.session_state.logged_in_email = None
+        st.query_params.clear() # Czyści błędny link
+elif "logged_in_email" not in st.session_state:
+    st.session_state.logged_in_email = None
+
 elif "logged_in_email" not in st.session_state:
     st.session_state.logged_in_email = None
 
