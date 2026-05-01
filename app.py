@@ -41,10 +41,9 @@ def save_data(df):
 def load_products():
     if os.path.exists(PRODUCTS_FILE):
         return pd.read_csv(PRODUCTS_FILE)
-    # Nowy cennik dostosowany do 10pkt / 1zł
     return pd.DataFrame([
         {'Nagroda': 'Zakwas świeży', 'Koszt': 150, 'Sztuk': 5},
-        {'Nagroda': 'Zakwas suszony', 'Koszt': 30, 'Sztuk': 5},
+        {'Nagroda': 'Zakwas suszony', 'Koszt': 300, 'Sztuk': 5},
         {'Nagroda': 'Chleb', 'Koszt': 500, 'Sztuk': 5}
     ])
 
@@ -109,7 +108,7 @@ if menu == "Mój Profil":
     else:
         u_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
         if not u_row.empty:
-            idx = u_row.index[0]
+            idx = u_row.index
             name, kod, pkt, aktywna = u_row['Nazwa'].iloc[0], u_row['Kod'].iloc[0], u_row['Punkty'].iloc[0], u_row['Aktywna_Nagroda'].iloc[0]
             
             st.header(f"Witaj, {name}!")
@@ -171,7 +170,7 @@ elif menu == "Panel Sprzedawcy":
         if k_in:
             search = st.session_state.db[st.session_state.db['Kod'] == k_in]
             if not search.empty:
-                s_idx = search.index[0]
+                s_idx = search.index
                 st.write(f"**Klient:** {search['Nazwa'].iloc[0]} | **Punkty:** {search['Punkty'].iloc[0]}")
                 
                 # Wydawanie
@@ -197,27 +196,33 @@ elif menu == "Panel Sprzedawcy":
         st.subheader("🛒 Magazyn i Oferta")
         of_df = load_products()
         st.dataframe(of_df)
-        
-        with st.expander("➕ Dodaj/Edytuj Produkt"):
-            n_n = st.text_input("Nazwa:")
-            n_k = st.number_input("Koszt (pkt):", value=100)
-            n_s = st.number_input("Sztuk:", value=10)
+        with st.expander("➕ Edytuj ofertę"):
+            n_naz = st.text_input("Produkt:")
+            n_kos = st.number_input("Koszt:", value=100)
+            n_szt = st.number_input("Sztuk:", value=10)
             if st.button("Zapisz produkt"):
-                if n_n in of_df['Nagroda'].values:
-                    of_df.loc[of_df['Nagroda'] == n_n, ['Koszt', 'Sztuk']] = [n_k, n_s]
+                if n_naz in of_df['Nagroda'].values:
+                    of_df.loc[of_df['Nagroda'] == n_naz, ['Koszt', 'Sztuk']] = [n_kos, n_szt]
                 else:
-                    of_df = pd.concat([of_df, pd.DataFrame([{'Nagroda':n_n,'Koszt':n_k,'Sztuk':n_s}])])
+                    of_df = pd.concat([of_df, pd.DataFrame([{'Nagroda':n_naz,'Koszt':n_kos,'Sztuk':n_szt}])])
                 save_products(of_df); st.rerun()
-
-        with st.expander("🗑️ Usuń Produkt"):
+        with st.expander("🗑️ Usuń produkt"):
             if not of_df.empty:
-                d_n = st.selectbox("Produkt do usunięcia:", of_df['Nagroda'].values)
-                if st.button("Usuń trwale"):
-                    of_df = of_df[of_df['Nagroda'] != d_n]
+                del_p = st.selectbox("Co usunąć?", of_df['Nagroda'].values)
+                if st.button("Potwierdź usunięcie produktu"):
+                    of_df = of_df[of_df['Nagroda'] != del_p]
                     save_products(of_df); st.rerun()
 
-        st.subheader("Baza Klientów")
+        st.write("---")
+        st.subheader("👥 Zarządzanie Klientami")
         st.dataframe(st.session_state.db)
+        with st.expander("👤 Usuń konto klienta"):
+            if not st.session_state.db.empty:
+                del_user = st.selectbox("Wybierz konto do skasowania:", st.session_state.db['Nazwa'].values)
+                if st.button("USUŃ KONTO NA ZAWSZE"):
+                    st.session_state.db = st.session_state.db[st.session_state.db['Nazwa'] != del_user]
+                    save_data(st.session_state.db)
+                    st.success(f"Usunięto konto: {del_user}"); st.rerun()
 
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
