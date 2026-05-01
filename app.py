@@ -46,7 +46,7 @@ if menu == "Mój Profil (Klient)":
 elif menu == "Panel Sprzedawcy":
     st.header("Panel Admina")
     pin = st.text_input("Hasło VIP:", type="password")
-    if pin == "twojehaslo123": # Tu ustaw swoje hasło
+    if pin == "miłosz2137": # Tu ustaw swoje hasło
         kod_input = st.text_input("Wpisz kod klienta:")
         ile_pkt = st.number_input("Punkty za zakup:", value=10)
         if st.button("Dodaj Punkty"):
