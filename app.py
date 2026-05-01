@@ -128,10 +128,37 @@ if menu == "Mój Profil":
 
 # --- SEKCJA: PANEL SPRZEDAWCY ---
 elif menu == "Panel Sprzedawcy":
-    pin = st.text_input("Hasło VIP:", type="password")
-    if pin == "milosz2137":
-        st.subheader("🛒 Zarządzanie Magazynem")
-        of_df = load_products()
+        pin = st.text_input("Hasło VIP:", type="password")
+        if pin == "milosz2137":
+        st.subheader("📸 Szybki Skaner QR")
+        
+        # Inicjalizacja pamięci skanu, jeśli nie istnieje
+        if 'last_scan' not in st.session_state:
+            st.session_state.last_scan = ""
+            
+        # Wyświetlenie okna kamery
+        img_cam = st.camera_input("Skieruj aparat na kod QR klienta")
+        
+        if img_cam:
+            import cv2
+            import numpy as np
+            
+            # Przetwarzanie obrazu
+            f_b = np.asarray(bytearray(img_cam.read()), dtype=np.uint8)
+            cv_i = cv2.imdecode(f_b, 1)
+            
+            # Detekcja kodu QR
+            det = cv2.QRCodeDetector()
+            val, b, s = det.detectAndDecode(cv_i)
+            
+            if val: 
+                st.session_state.last_scan = val
+                st.success(f"✅ Odczytano kod: {val}")
+        
+        st.write("---")
+        # Pole na kod, które automatycznie uzupełnia się po skanie
+        k_in = st.text_input("Kod klienta (wpisz lub zeskanuj powyżej):", value=st.session_state.last_scan)
+
         
         with st.expander("➕ Dodaj Produkt i ZDJĘCIE"):
             n_naz = st.text_input("Nazwa produktu (np. Chleb):")
