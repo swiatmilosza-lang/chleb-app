@@ -1,3 +1,4 @@
+import qrcode
 import streamlit as st
 import pandas as pd
 import random
@@ -136,7 +137,9 @@ if menu == "Mój Profil":
                 st.metric("Twój Kod", kod)
             
             # Kod QR dla klienta
-            st.image(f"https://qrserver.com{kod}", caption="Pokaż kod przy stoisku")
+            qr_img = qrcode.make(str(kod))
+            st.image(qr_img.get_image(), width=150, caption="Pokaż kod przy stoisku")
+
             
             if not (pd.isna(aktywna) or str(aktywna).strip() == ""):
                 st.warning(f"🎫 MASZ AKTYWNE KUPONY: **{aktywna}**")
