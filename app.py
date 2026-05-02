@@ -94,6 +94,7 @@ if menu == "Mój Profil":
                 else: st.error("Brak konta.")
         
         with tab2:
+            st.subheader("Nowe konto (+50 Bąbelków!)")
             n_name = st.text_input("Imię:")
             n_email = st.text_input("Gmail:")
             n_pass = st.text_input("Hasło:", type="password")
@@ -109,10 +110,12 @@ if menu == "Mój Profil":
                         st.success("Witaj!"); st.balloons(); st.rerun()
                     else: st.error("E-mail zajęty.")
     else:
-        u_row = st.session_state.db[st.session_state.db['Gmail'] == st.session_state.logged_in_email]
-        if not u_row.empty:
-            idx = u_row.index
-            name, kod, pkt, aktywna = u_row['Nazwa'].iloc[0], u_row['Kod'].iloc[0], u_row['Punkty'].iloc[0], u_row['Aktywna_Nagroda'].iloc[0]
+        user_mask = st.session_state.db['Gmail'] == st.session_state.logged_in_email
+        if user_mask.any():
+            name = st.session_state.db.loc[user_mask, 'Nazwa'].iloc[0]
+            kod = st.session_state.db.loc[user_mask, 'Kod'].iloc[0]
+            pkt = st.session_state.db.loc[user_mask, 'Punkty'].iloc[0]
+            aktywna = st.session_state.db.loc[user_mask, 'Aktywna_Nagroda'].iloc[0]
             
             st.header(f"Witaj, {name}!")
             c_a, c_b = st.columns(2)
@@ -122,13 +125,14 @@ if menu == "Mój Profil":
             qr = qrcode.make(str(kod))
             st.image(qr.get_image(), width=180)
             
-            if aktywna: st.warning(f"🎫 KUPONY: {aktywna}")
+            if aktywna and str(aktywna).strip() != "":
+                st.warning(f"🎫 KUPONY: {aktywna}")
 
             st.write("---")
             st.subheader("🎁 Oferta Inżyniera:")
             o_df = load_products()
             for i, r in o_df.iterrows():
-                col_img, col_txt = st.columns([1, 2])
+                col_img, col_txt = st.columns()
                 with col_img:
                     img_path = os.path.join(IMG_DIR, f"{r['Nagroda']}.jpg")
                     if os.path.exists(img_path): st.image(img_path, use_container_width=True)
@@ -139,12 +143,17 @@ if menu == "Mój Profil":
                     btn_t = "primary" if pkt >= r['Koszt'] else "secondary"
                     if st.button(f"🟢 Aktywuj" if pkt >= r['Koszt'] else "Zbieraj dalej", key=f"k_{r['Nagroda']}", type=btn_t):
                         if pkt >= r['Koszt'] and r['Sztuk'] > 0:
-                            st.session_state.db.loc[idx, 'Punkty'] -= r['Koszt']
+                            # Bezpośrednia modyfikacja za pomocą maski, aby uniknąć błędów ValueError
+                            st.session_state.db.loc[user_mask, 'Punkty'] -= r['Koszt']
                             o_df.loc[i, 'Sztuk'] -= 1
                             save_products(o_df)
-                            stara = st.session_state.db.loc[idx, 'Aktywna_Nagroda']
-                            st.session_state.db.loc[idx, 'Aktywna_Nagroda'] = r['Nagroda'] if not stara else f"{stara}, {r['Nagroda']}"
+                            
+                            stara_n = st.session_state.db.loc[user_mask, 'Aktywna_Nagroda'].iloc[0]
+                            nowa_n = r['Nagroda'] if not stara_n else f"{stara_n}, {r['Nagroda']}"
+                            st.session_state.db.loc[user_mask, 'Aktywna_Nagroda'] = nowa_n
+                            
                             save_data(st.session_state.db)
+                            st.success(f"Aktywowano!")
                             st.rerun()
             
             if st.button("Wyloguj"):
@@ -157,7 +166,6 @@ elif menu == "Panel Sprzedawcy":
     pin = st.text_input("Hasło VIP:", type="password")
     
     if pin == "milosz2137":
-        # Dopiero po haśle ładujemy ofertę i wyświetlamy resztę
         of_df = load_products()
         
         st.subheader("📸 Skaner QR")
@@ -174,24 +182,26 @@ elif menu == "Panel Sprzedawcy":
         st.write("---")
         k_in = st.text_input("Kod klienta:", value=st.session_state.last_scan)
         if k_in:
-            search = st.session_state.db[st.session_state.db['Kod'] == k_in]
-            if not search.empty:
-                s_idx = search.index
-                st.write(f"**Klient:** {search['Nazwa'].iloc[0]} | **Punkty:** {search['Punkty'].iloc[0]}")
-                k_str = str(search['Aktywna_Nagroda'].iloc[0]).strip()
-                if k_str and k_str != "nan":
+            search_mask = st.session_state.db['Kod'] == k_in
+            if search_mask.any():
+                st.write(f"**Klient:** {st.session_state.db.loc[search_mask, 'Nazwa'].iloc[0]} | **Punkty:** {st.session_state.db.loc[search_mask, 'Punkty'].iloc[0]}")
+                k_str = str(st.session_state.db.loc[search_mask, 'Aktywna_Nagroda'].iloc[0]).strip()
+                
+                if k_str and k_str != "nan" and k_str != "":
                     lista = [k.strip() for k in k_str.split(",") if k.strip()]
                     for i, k in enumerate(lista):
                         if st.button(f"Wydaj: {k}", key=f"w_{i}_{k_in}"):
                             lista.pop(i)
-                            st.session_state.db.loc[s_idx, 'Aktywna_Nagroda'] = ", ".join(lista)
+                            st.session_state.db.loc[search_mask, 'Aktywna_Nagroda'] = ", ".join(lista)
                             save_data(st.session_state.db); st.rerun()
                 
                 p_za_zl = 10
                 kwota = st.number_input("Kwota (zł):", min_value=1, value=10)
                 if st.button("DODAJ PUNKTY"):
-                    st.session_state.db.loc[s_idx, 'Punkty'] += (kwota * p_za_zl)
+                    st.session_state.db.loc[search_mask, 'Punkty'] += (kwota * p_za_zl)
                     save_data(st.session_state.db); st.success("Dodano!"); st.rerun()
+            else:
+                st.error("Brak kodu!")
 
         st.write("---")
         st.subheader("🛒 Zarządzanie Magazynem")
@@ -228,6 +238,7 @@ elif menu == "Panel Sprzedawcy":
 elif menu == "YouTube & Info":
     st.header("Subskrybuj Inżynier Wypieku!")
     st.link_button("🔴 MÓJ KANAŁ YT", "https://www.youtube.com/@inzynierwypieku")
+
 
 
 
