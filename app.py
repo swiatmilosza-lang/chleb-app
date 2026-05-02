@@ -132,7 +132,7 @@ if menu == "Mój Profil":
             st.subheader("🎁 Oferta Inżyniera:")
             o_df = load_products()
             for i, r in o_df.iterrows():
-                col_img, col_txt = st.columns()
+                col_img, col_txt = st.columns(2)
                 with col_img:
                     img_path = os.path.join(IMG_DIR, f"{r['Nagroda']}.jpg")
                     if os.path.exists(img_path): st.image(img_path, use_container_width=True)
